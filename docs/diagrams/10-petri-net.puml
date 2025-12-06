@@ -1,0 +1,19 @@
+@startuml Petri Net Authentication Flow
+!theme plain
+
+start
+:Ожидание ввода данных;
+:Валидация данных;
+:Проверка email в БД;
+if (Email свободен?) then (yes)
+  :Хеширование пароля;
+  :Создание пользователя в БД;
+  :Генерация JWT токена;
+  :Успешная регистрация;
+else (no)
+  :Ошибка: email занят;
+endif
+stop
+
+@enduml
+

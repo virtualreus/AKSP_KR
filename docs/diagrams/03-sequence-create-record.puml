@@ -1,0 +1,32 @@
+@startuml Sequence Create Record
+!theme plain
+
+actor User
+participant Frontend
+participant "API Gateway" as Gateway
+participant "Medical Service" as Medical
+database "Medical DB" as DB
+
+User -> Frontend: Заполняет форму создания записи
+Frontend -> Gateway: POST /api/v1/medical/records\nAuthorization: Bearer {token}\n{title, description, record_date, ...}
+activate Gateway
+Gateway -> Gateway: JWT middleware: валидация токена
+Gateway -> Gateway: Извлечение user_id из claims
+Gateway -> Gateway: Добавление user_id в контекст
+Gateway -> Medical: POST /api/v1/medical/records
+activate Medical
+Medical -> Medical: Извлечение user_id из контекста
+Medical -> Medical: Валидация данных
+Medical -> DB: INSERT INTO medical_records\n(user_id, title, description, ...)
+activate DB
+DB --> Medical: Созданная запись (с ID)
+deactivate DB
+Medical --> Gateway: 201 Created\n{record}
+deactivate Medical
+Gateway --> Frontend: 201 Created\n{record}
+deactivate Gateway
+Frontend -> Frontend: Обновление списка записей
+Frontend --> User: Отображение новой записи
+
+@enduml
+

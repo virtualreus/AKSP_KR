@@ -1,5 +1,5 @@
 <template>
-  <p v-if="message" class="error">{{ message }}</p>
+  <p v-if="message" class="success">{{ message }}</p>
 </template>
 
 <script setup lang="ts">
@@ -7,11 +7,11 @@ defineProps<{ message: string | null }>();
 </script>
 
 <style scoped>
-.error {
-  color: #fecdd3;
-  background: rgba(239, 68, 68, 0.1);
+.success {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.1);
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(34, 197, 94, 0.35);
 }
 </style>

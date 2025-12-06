@@ -1,0 +1,13 @@
+@startuml DFD Level 0 Context
+!theme plain
+
+actor "Пользователь" as User
+rectangle "Система мониторинга здоровья" as System
+database "База данных" as DB
+
+User --> System : Запросы данных\nВвод данных
+System --> User : Отображение данных
+System <--> DB : Чтение/Запись данных
+
+@enduml
+

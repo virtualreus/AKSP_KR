@@ -1,0 +1,24 @@
+@startuml C4 Container Diagram
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+Person(user, "Пользователь", "Врач или пациент, использующий систему")
+
+System_Boundary(reagnull, "ReagNull Health Monitoring") {
+    Container(frontend, "Frontend", "Vue.js 3 + TypeScript", "SPA для ввода и просмотра данных")
+    Container(gateway, "API Gateway", "Go + Chi", "Единая точка входа, маршрутизация, JWT, CORS")
+    Container(authService, "Auth Service", "Go + Chi", "Регистрация, логин, выдача JWT")
+    Container(medicalService, "Medical Service", "Go + Chi", "CRUD медицинских записей и показателей")
+    ContainerDb(sharedDb, "Shared Database", "PostgreSQL 16", "users, medical_records, health_metrics")
+}
+
+Rel(user, frontend, "Использует", "HTTPS")
+Rel(frontend, gateway, "REST API", "HTTPS")
+Rel(gateway, authService, "Проксирует /api/v1/auth/*", "HTTP")
+Rel(gateway, medicalService, "Проксирует /api/v1/medical/*", "HTTP")
+Rel(authService, sharedDb, "Чтение/запись", "SQL")
+Rel(medicalService, sharedDb, "Чтение/запись", "SQL")
+
+@enduml
+

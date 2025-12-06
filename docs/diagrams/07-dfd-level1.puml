@@ -1,0 +1,27 @@
+@startuml DFD Level 1 Process Decomposition
+!theme plain
+
+actor "Пользователь" as User
+
+rectangle "1.0\nАутентификация" as P1
+rectangle "2.0\nУправление записями" as P2
+rectangle "3.0\nУправление показателями" as P3
+
+database "D1: Пользователи" as D1
+database "D2: Медицинские записи" as D2
+database "D3: Показатели здоровья" as D3
+
+User --> P1 : Логин/Пароль
+P1 --> User : Токен доступа
+P1 <--> D1
+
+User --> P2 : Данные записи
+P2 --> User : Список записей
+P2 <--> D2
+
+User --> P3 : Данные показателя
+P3 --> User : Список показателей
+P3 <--> D3
+
+@enduml
+

@@ -1,92 +1,116 @@
 <template>
-  <form class="card" @submit.prevent="onSubmit">
-    <h3>{{ form.id ? 'Редактировать' : 'Создать' }} запись</h3>
+  <form class="card form" @submit.prevent="onSubmit">
+    <div class="form-header">
+      <p class="pill">{{ form.id ? "Редактировать" : "Создать" }} запись</p>
+      <h3>Медицинская карточка</h3>
+    </div>
     <label>Заголовок</label>
-    <input v-model="form.title" required />
+    <input
+      v-model="form.title"
+      required
+      placeholder="Например, Осмотр у терапевта"
+    />
     <label>Описание</label>
-    <textarea v-model="form.description"></textarea>
+    <textarea
+      v-model="form.description"
+      placeholder="Краткие заметки визита"
+    ></textarea>
     <label>Дата записи</label>
     <input v-model="form.record_date" type="date" />
     <label>Врач</label>
-    <input v-model="form.doctor_name" />
+    <input v-model="form.doctor_name" placeholder="Имя врача" />
     <label>Диагноз</label>
-    <input v-model="form.diagnosis" />
+    <input v-model="form.diagnosis" placeholder="Диагноз или заключение" />
     <div class="actions">
-      <button type="submit">{{ loading ? '...' : 'Сохранить' }}</button>
-      <button type="button" class="secondary" @click="$emit('cancel')">Отмена</button>
+      <button class="btn btn-primary" type="submit">
+        {{ loading ? "..." : "Сохранить" }}
+      </button>
+      <button class="btn btn-ghost" type="button" @click="$emit('cancel')">
+        Отмена
+      </button>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
-import type { MedicalRecord } from '@/types/medical'
+import { reactive, watch } from "vue";
+import type { MedicalRecord } from "@/types/medical";
 
 const props = defineProps<{
-  record?: MedicalRecord | null
-  loading: boolean
-}>()
+  record?: MedicalRecord | null;
+  loading: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'save', payload: Partial<MedicalRecord>): void
-  (e: 'cancel'): void
-}>()
+  (e: "save", payload: Partial<MedicalRecord>): void;
+  (e: "cancel"): void;
+}>();
 
 const form = reactive<Partial<MedicalRecord>>({
   id: undefined,
-  title: '',
-  description: '',
-  record_date: '',
-  doctor_name: '',
-  diagnosis: '',
-})
+  title: "",
+  description: "",
+  record_date: "",
+  doctor_name: "",
+  diagnosis: "",
+});
 
 watch(
   () => props.record,
   (val) => {
     if (val) {
-      Object.assign(form, val)
+      Object.assign(form, {
+        ...val,
+        // Преобразуем ISO дату в формат YYYY-MM-DD для input type="date"
+        record_date: val.record_date
+          ? new Date(val.record_date).toISOString().split("T")[0]
+          : "",
+      });
     } else {
       Object.assign(form, {
         id: undefined,
-        title: '',
-        description: '',
-        record_date: '',
-        doctor_name: '',
-        diagnosis: '',
-      })
+        title: "",
+        description: "",
+        record_date: "",
+        doctor_name: "",
+        diagnosis: "",
+      });
     }
   },
-  { immediate: true },
-)
+  { immediate: true }
+);
 
 function onSubmit() {
-  emit('save', { ...form })
+  const payload: Partial<MedicalRecord> = {
+    title: form.title,
+    description: form.description || undefined,
+    doctor_name: form.doctor_name || undefined,
+    diagnosis: form.diagnosis || undefined,
+  };
+
+  // Преобразуем дату из формата YYYY-MM-DD в ISO 8601 с временем
+  if (form.record_date) {
+    // Добавляем время 00:00:00 и конвертируем в ISO формат
+    const date = new Date(form.record_date + "T00:00:00");
+    payload.record_date = date.toISOString();
+  }
+
+  emit("save", payload);
 }
 </script>
 
 <style scoped>
-.card {
-  background: #fff;
-  padding: 16px;
-  border-radius: 8px;
+.form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
-textarea,
-input,
-button {
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
+.form-header h3 {
+  margin: 6px 0;
 }
 .actions {
   display: flex;
   gap: 8px;
-}
-.secondary {
-  background: #e5e7eb;
+  justify-content: flex-end;
 }
 </style>
-

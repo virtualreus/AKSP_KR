@@ -56,7 +56,11 @@ func mustReverseProxy(target string) http.Handler {
 		// keep Authorization header as-is
 	}
 	proxy.ModifyResponse = func(resp *http.Response) error {
-		// normalize 404/500 passthrough; no-op for now
+		// Drop downstream CORS headers to avoid duplicates with gateway CORS middleware.
+		resp.Header.Del("Access-Control-Allow-Origin")
+		resp.Header.Del("Access-Control-Allow-Credentials")
+		resp.Header.Del("Access-Control-Allow-Headers")
+		resp.Header.Del("Access-Control-Allow-Methods")
 		return nil
 	}
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {

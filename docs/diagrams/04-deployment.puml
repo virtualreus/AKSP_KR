@@ -1,0 +1,37 @@
+@startuml Deployment Diagram
+!theme plain
+skinparam nodeStyle rectangle
+
+node "Docker Host" {
+  node "Frontend Container" as FE {
+    artifact "Frontend\nVue.js 3\nnginx:80" as FrontendApp
+  }
+  
+  node "API Gateway Container" as GW {
+    artifact "API Gateway\nGo Binary\n:8080" as GatewayApp
+  }
+  
+  node "Auth Service Container" as AUTH {
+    artifact "Auth Service\nGo Binary\n:8081" as AuthApp
+  }
+  
+  node "Medical Service Container" as MED {
+    artifact "Medical Service\nGo Binary\n:8082" as MedApp
+  }
+  
+  database "PostgreSQL Shared\n:5432" as SharedDB
+}
+
+cloud "Internet" {
+  actor User
+}
+
+User --> FrontendApp : http://localhost:5173
+FrontendApp --> GatewayApp : http://api-gateway:8080
+GatewayApp --> AuthApp : http://auth-service:8081
+GatewayApp --> MedApp : http://medical-service:8082
+AuthApp --> SharedDB : postgres://postgres:5432
+MedApp --> SharedDB : postgres://postgres:5432
+
+@enduml
+

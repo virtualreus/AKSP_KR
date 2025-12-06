@@ -1,0 +1,27 @@
+@startuml Architecture Components
+!theme plain
+skinparam componentStyle rectangle
+
+package "Client Layer" {
+  component [Frontend\nVue.js 3 + TypeScript] as Frontend
+}
+
+package "API Gateway Layer" {
+  component [API Gateway\nGo + Chi] as Gateway
+}
+
+package "Microservices Layer" {
+  component [Auth Service\nGo + Chi] as AuthService
+  component [Medical Service\nGo + Chi] as MedicalService
+}
+
+database "PostgreSQL\nShared DB" as SharedDB
+
+Frontend --> Gateway : HTTP/REST\nJWT Auth
+Gateway --> AuthService : Proxy\n/api/v1/auth/*
+Gateway --> MedicalService : Proxy\n/api/v1/medical/*
+AuthService --> SharedDB : SQL
+MedicalService --> SharedDB : SQL
+
+@enduml
+

@@ -1,0 +1,35 @@
+@startuml Sequence Register
+!theme plain
+
+actor User
+participant Frontend
+participant "API Gateway" as Gateway
+participant "Auth Service" as Auth
+database "Auth DB" as DB
+
+User -> Frontend: Заполняет форму регистрации
+Frontend -> Gateway: POST /api/v1/auth/register\n{email, password, firstName, lastName}
+activate Gateway
+Gateway -> Gateway: Проверка публичного эндпоинта
+Gateway -> Auth: POST /api/v1/auth/register
+activate Auth
+Auth -> Auth: Валидация данных
+Auth -> DB: Проверка существования email
+activate DB
+DB --> Auth: Результат проверки
+deactivate DB
+Auth -> Auth: Хеширование пароля (bcrypt)
+Auth -> DB: INSERT INTO users
+activate DB
+DB --> Auth: Созданный пользователь
+deactivate DB
+Auth -> Auth: Генерация JWT токена
+Auth --> Gateway: 201 Created\n{token, user}
+deactivate Auth
+Gateway --> Frontend: 201 Created\n{token, user}
+deactivate Gateway
+Frontend -> Frontend: Сохранение токена в localStorage
+Frontend --> User: Редирект на Dashboard
+
+@enduml
+

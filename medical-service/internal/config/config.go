@@ -18,7 +18,7 @@ func getenv(key, def string) string {
 func Load() Config {
 	return Config{
 		Port:        getenv("MEDICAL_PORT", "8082"),
-		DatabaseURL: getenv("MEDICAL_DATABASE_URL", "postgres://postgres:postgres@postgres-medical:5433/postgres?sslmode=disable"),
+		DatabaseURL: getenv("MEDICAL_DATABASE_URL", "postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable"),
 		JWTSecret:   getenv("JWT_SECRET", "dev-secret"),
 	}
 }

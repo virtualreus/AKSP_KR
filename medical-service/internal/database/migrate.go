@@ -14,6 +14,8 @@ var embedMigrations embed.FS
 
 func Migrate(ctx context.Context, db *sql.DB) error {
 	goose.SetBaseFS(embedMigrations)
+	// Разделяем таблицу версий для общего Postgres, чтобы не конфликтовать с другими сервисами.
+	goose.SetTableName("goose_db_version_medical")
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set dialect: %w", err)
 	}
@@ -22,4 +24,3 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	}
 	return nil
 }
-

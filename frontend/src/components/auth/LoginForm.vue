@@ -1,56 +1,62 @@
 <template>
-  <form class="card" @submit.prevent="onSubmit">
-    <h2>Вход</h2>
+  <form class="card form" @submit.prevent="onSubmit">
+    <div class="form-header">
+      <div>
+        <p class="pill">Авторизация</p>
+        <h2>Войти в аккаунт</h2>
+        <p class="muted">Введите почту и пароль, чтобы продолжить.</p>
+      </div>
+    </div>
     <label>Email</label>
-    <input v-model="email" type="email" required />
+    <input
+      v-model="email"
+      type="email"
+      required
+      placeholder="you@example.com"
+    />
     <label>Пароль</label>
-    <input v-model="password" type="password" required />
+    <input v-model="password" type="password" required placeholder="••••••••" />
     <ErrorMessage :message="error" />
-    <button type="submit" :disabled="loading">
-      {{ loading ? '...' : 'Войти' }}
+    <button class="btn btn-primary full" type="submit" :disabled="loading">
+      {{ loading ? "Загрузка..." : "Войти" }}
     </button>
   </form>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import ErrorMessage from '@/components/common/ErrorMessage.vue'
+import { ref, computed } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import ErrorMessage from "@/components/common/ErrorMessage.vue";
 
-const auth = useAuthStore()
-const router = useRouter()
+const auth = useAuthStore();
+const router = useRouter();
 
-const email = ref('')
-const password = ref('')
+const email = ref("");
+const password = ref("");
 
-const loading = computed(() => auth.loading)
-const error = computed(() => auth.error)
+const loading = computed(() => auth.loading);
+const error = computed(() => auth.error);
 
 async function onSubmit() {
-  await auth.login(email.value, password.value)
+  await auth.login(email.value, password.value);
   if (auth.isAuthenticated) {
-    router.push('/')
+    router.push("/");
   }
 }
 </script>
 
 <style scoped>
-.card {
+.form {
   width: 100%;
-  max-width: 360px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
-
-label {
-  font-weight: 600;
-  color: #0f172a;
+.form-header h2 {
+  margin: 4px 0;
 }
-
-button {
+.full {
   width: 100%;
 }
 </style>
-

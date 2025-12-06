@@ -4,8 +4,10 @@ services:
   api-gateway:
     build: ./api-gateway
     depends_on:
-      - auth-service
-      - medical-service
+      auth-service:
+        condition: service_healthy
+      medical-service:
+        condition: service_healthy
     environment:
       GATEWAY_PORT: "8080"
       AUTH_SERVICE_URL: http://auth-service:8081
@@ -18,26 +20,40 @@ services:
   auth-service:
     build: ./auth-service
     depends_on:
-      postgres-auth:
+      postgres:
         condition: service_healthy
     environment:
       AUTH_PORT: "8081"
-      AUTH_DATABASE_URL: postgres://postgres:postgres@postgres-auth:5432/postgres?sslmode=disable
+      AUTH_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
       JWT_SECRET: dev-secret
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   medical-service:
     build: ./medical-service
     depends_on:
-      postgres-medical:
+      postgres:
+        condition: service_healthy
+      auth-service:
         condition: service_healthy
     environment:
       MEDICAL_PORT: "8082"
-      MEDICAL_DATABASE_URL: postgres://postgres:postgres@postgres-medical:5432/postgres?sslmode=disable
+      MEDICAL_DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
       JWT_SECRET: dev-secret
     ports:
       - "8082:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   frontend:
     build: ./frontend
@@ -48,7 +64,7 @@ services:
     depends_on:
       - api-gateway
 
-  postgres-auth:
+  postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
@@ -60,27 +76,9 @@ services:
       timeout: 3s
       retries: 5
     volumes:
-      - postgres-auth-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - "5434:5432"
 
-  postgres-medical:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    volumes:
-      - postgres-medical-data:/var/lib/postgresql/data
-    ports:
-      - "5435:5432"
-
 volumes:
-  postgres-auth-data:
-  postgres-medical-data:
-
+  postgres-data:

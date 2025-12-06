@@ -1,0 +1,62 @@
+@startuml ERD Database Schema
+!theme plain
+skinparam linetype ortho
+
+entity "users" as users {
+  * id : UUID <<PK>>
+  --
+  * email : TEXT <<UK>>
+  * password_hash : TEXT
+  first_name : TEXT
+  last_name : TEXT
+  * created_at : TIMESTAMPTZ
+  * updated_at : TIMESTAMPTZ
+}
+
+entity "medical_records" as records {
+  * id : UUID <<PK>>
+  --
+  * user_id : UUID <<FK>>
+  * title : TEXT
+  description : TEXT
+  * record_date : DATE
+  doctor_name : TEXT
+  diagnosis : TEXT
+  * created_at : TIMESTAMPTZ
+  * updated_at : TIMESTAMPTZ
+}
+
+entity "health_metrics" as metrics {
+  * id : UUID <<PK>>
+  --
+  * user_id : UUID <<FK>>
+  * metric_type : TEXT
+  * value : DOUBLE PRECISION
+  * unit : TEXT
+  * recorded_at : TIMESTAMPTZ
+  notes : TEXT
+  * created_at : TIMESTAMPTZ
+}
+
+users ||--o{ records : "has"
+users ||--o{ metrics : "has"
+
+note right of users
+  Shared PostgreSQL
+  Index on email
+end note
+
+note right of records
+  Shared PostgreSQL
+  Indexes on user_id,
+  (user_id, record_date)
+end note
+
+note right of metrics
+  Shared PostgreSQL
+  Indexes on user_id,
+  (user_id, metric_type)
+end note
+
+@enduml
+

@@ -20,7 +20,7 @@ func getenv(key, def string) string {
 func Load() Config {
 	return Config{
 		Port:        getenv("AUTH_PORT", "8081"),
-		DatabaseURL: getenv("AUTH_DATABASE_URL", "postgres://postgres:postgres@postgres-auth:5432/postgres?sslmode=disable"),
+		DatabaseURL: getenv("AUTH_DATABASE_URL", "postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable"),
 		JWTSecret:   getenv("JWT_SECRET", "dev-secret"),
 	}
 }
