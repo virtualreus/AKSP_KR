@@ -1,0 +1,964 @@
+================================================================================
+TODO - РАЗРАБОТКА АРХИТЕКТУРЫ ПРИЛОЖЕНИЯ ДЛЯ МОНИТОРИНГА ЗДОРОВЬЯ
+================================================================================
+
+ТЕХНОЛОГИЧЕСКИЙ СТЕК:
+- Backend: Go 1.21+, Chi router
+- Frontend: TypeScript, Vue.js 3
+- БД: PostgreSQL 15+
+- Инфраструктура: Docker, Docker Compose, Kubernetes (описание)
+- CI/CD: Jenkins
+- Инструменты: GoLand, draw.io, git
+
+АРХИТЕКТУРА:
+- API Gateway (Go + Chi)
+- Auth Service (Go + Chi + PostgreSQL)
+- Medical Service (Go + Chi + PostgreSQL)
+- Frontend (Vue.js + TypeScript)
+
+================================================================================
+ЭТАП 1: ИНИЦИАЛИЗАЦИЯ ПРОЕКТА И СТРУКТУРЫ
+================================================================================
+
+1.1. Создать структуру директорий проекта
+    - Создать корневую директорию AKSP/
+    - Создать поддиректории:
+      * api-gateway/
+      * auth-service/
+      * medical-service/
+      * frontend/
+      * docs/
+      * docker/
+      * scripts/
+
+1.2. Инициализировать Git репозиторий
+    - git init
+    - Создать .gitignore для Go, Node.js, Docker
+    - Создать README.md с описанием проекта
+
+1.3. Создать общий go.mod для монорепозитория (опционально)
+    - Или отдельные go.mod для каждого сервиса
+
+================================================================================
+ЭТАП 2: API GATEWAY
+================================================================================
+
+2.1. Инициализация проекта
+    - Создать api-gateway/go.mod
+    - Установить зависимости: github.com/go-chi/chi/v5, github.com/go-chi/cors
+    - Создать main.go
+
+2.2. Базовая структура Gateway
+    - Создать структуру проекта:
+      * cmd/gateway/main.go
+      * internal/config/config.go (конфигурация)
+      * internal/handler/handler.go (обработчики)
+      * internal/middleware/auth.go (JWT проверка)
+      * internal/middleware/cors.go (CORS)
+      * internal/middleware/logging.go (логирование)
+      * internal/router/router.go (маршрутизация)
+      * pkg/client/auth_client.go (HTTP клиент для Auth Service)
+      * pkg/client/medical_client.go (HTTP клиент для Medical Service)
+
+2.3. Конфигурация
+    - Создать config.go с настройками:
+      * Порт Gateway (8080)
+      * URL Auth Service
+      * URL Medical Service
+      * JWT секретный ключ
+      * CORS настройки
+    - Поддержка переменных окружения (.env файл)
+
+2.4. Middleware для аутентификации
+    - Реализовать JWT middleware:
+      * Извлечение токена из заголовка Authorization
+      * Валидация токена
+      * Пропуск публичных эндпоинтов (/auth/register, /auth/login)
+      * Добавление user_id в контекст запроса
+
+2.5. Middleware для CORS
+    - Настроить CORS для Vue.js frontend
+    - Разрешить методы: GET, POST, PUT, DELETE, OPTIONS
+    - Разрешить заголовки: Content-Type, Authorization
+
+2.6. Middleware для логирования
+    - Логирование всех входящих запросов
+    - Логирование времени выполнения
+    - Логирование ошибок
+
+2.7. HTTP клиенты для микросервисов (УПРОЩЕНО ДЛЯ MVP)
+    - Создать простой HTTP клиент для проксирования:
+      * Прямое проксирование запросов через http.Client
+      * Обработка базовых ошибок
+    - ПРИМЕЧАНИЕ: Для MVP не нужны сложные клиенты - достаточно простого проксирования
+
+2.8. Роутинг
+    - Настроить Chi router:
+      * /api/v1/auth/* -> проксирование к Auth Service
+      * /api/v1/medical/* -> проксирование к Medical Service (с проверкой JWT)
+      * Health check endpoint: /health
+    - Реализовать проксирование запросов:
+      * Передача всех заголовков
+      * Передача тела запроса
+      * Обработка ответов от сервисов
+      * Обработка ошибок (таймауты, недоступность сервиса)
+
+2.9. Обработка ошибок
+    - Единый формат ответов об ошибках
+    - Маппинг HTTP статусов от микросервисов
+    - Логирование ошибок
+
+2.10. Dockerfile для API Gateway
+    - Мультистейдж build (builder + runtime)
+    - Использование alpine образа
+    - Копирование бинарника
+    - Настройка порта 8080
+    - Health check
+
+================================================================================
+ЭТАП 3: AUTH SERVICE
+================================================================================
+
+3.1. Инициализация проекта
+    - Создать auth-service/go.mod
+    - Установить зависимости:
+      * github.com/go-chi/chi/v5
+      * github.com/go-chi/cors
+      * github.com/golang-jwt/jwt/v5
+      * github.com/lib/pq (PostgreSQL driver)
+      * github.com/jmoiron/sqlx - УБРАТЬ ДЛЯ MVP (использовать стандартный database/sql)
+      * golang.org/x/crypto/bcrypt (хеширование паролей)
+      * github.com/joho/godotenv (загрузка .env)
+    - Создать main.go
+
+3.2. Структура проекта
+    - Создать структуру:
+      * cmd/auth/main.go
+      * internal/config/config.go
+      * internal/database/database.go (подключение к БД)
+      * internal/models/user.go (модель пользователя)
+      * internal/repository/user_repository.go (работа с БД)
+      * internal/service/auth_service.go (бизнес-логика)
+      * internal/handler/auth_handler.go (HTTP обработчики)
+      * internal/middleware/cors.go
+      * internal/middleware/logging.go
+      * internal/router/router.go
+      * pkg/jwt/jwt.go (работа с JWT токенами)
+      * migrations/ (SQL миграции)
+
+3.3. Конфигурация
+    - Создать config.go:
+      * Порт сервиса (8081)
+      * Параметры подключения к PostgreSQL
+      * JWT секретный ключ
+      * Время жизни токена
+      * CORS настройки
+
+3.4. Модель данных User
+    - Структура User:
+      * ID (UUID или int)
+      * Email (string, unique)
+      * PasswordHash (string)
+      * FirstName (string)
+      * LastName (string)
+      * CreatedAt (time.Time)
+      * UpdatedAt (time.Time)
+
+3.5. Миграции БД
+    - Создать migrations/001_create_users_table.sql:
+      * Таблица users с полями из модели
+      * Индекс на email
+      * Ограничения (NOT NULL, UNIQUE)
+    - Создать простой SQL скрипт для применения миграций
+    - ПРИМЕЧАНИЕ: Для MVP не нужны сложные инструменты миграций
+
+3.6. Database слой
+    - Создать database.go:
+      * Функция подключения к PostgreSQL
+      * Функция закрытия соединения
+      * Проверка соединения (ping)
+    - Использовать connection pooling
+
+3.7. Repository слой
+    - Создать user_repository.go:
+      * CreateUser(user) - создание пользователя
+      * GetUserByEmail(email) - получение по email
+      * GetUserByID(id) - получение по ID
+      * ПРИМЕЧАНИЕ: UpdateUser и DeleteUser - УБРАТЬ ДЛЯ MVP (не нужны для базовой функциональности)
+    - Использовать prepared statements
+    - Обработка ошибок БД
+
+3.8. JWT утилиты
+    - Создать jwt.go:
+      * GenerateToken(userID, email) - генерация JWT токена
+      * ValidateToken(tokenString) - валидация токена
+      * ExtractClaims(tokenString) - извлечение claims
+    - Использовать HS256 алгоритм
+      * Claims: user_id, email, exp, iat
+
+3.9. Service слой (бизнес-логика)
+    - Создать auth_service.go:
+      * Register(email, password, firstName, lastName) - регистрация:
+        - Проверка существования пользователя
+        - Хеширование пароля (bcrypt)
+        - Создание пользователя в БД
+        - Возврат созданного пользователя (без пароля)
+      * Login(email, password) - авторизация:
+        - Поиск пользователя по email
+        - Проверка пароля (bcrypt.CompareHashAndPassword)
+        - Генерация JWT токена
+        - Возврат токена и информации о пользователе
+      * ValidateToken(tokenString) - валидация токена
+      * GetUserByID(id) - получение пользователя
+
+3.10. Handler слой (HTTP обработчики)
+    - Создать auth_handler.go:
+      * RegisterHandler(w, r) - POST /api/v1/auth/register:
+        - Парсинг JSON тела запроса
+        - Валидация данных (email формат, длина пароля)
+        - Вызов Register из service
+        - Возврат JSON ответа (201 Created)
+        - Обработка ошибок (400, 409 Conflict если email занят)
+      * LoginHandler(w, r) - POST /api/v1/auth/login:
+        - Парсинг JSON тела запроса
+        - Вызов Login из service
+        - Возврат JSON с токеном и пользователем (200 OK)
+        - Обработка ошибок (401 Unauthorized)
+      * GetUserHandler(w, r) - GET /api/v1/auth/me:
+        - Извлечение user_id из контекста (после JWT middleware)
+        - Вызов GetUserByID из service
+        - Возврат JSON с пользователем (200 OK)
+        - Обработка ошибок (404, 500)
+
+3.11. Middleware
+    - CORS middleware (аналогично Gateway)
+    - Logging middleware (логирование запросов)
+
+3.12. Роутинг
+    - Настроить Chi router:
+      * POST /api/v1/auth/register - публичный
+      * POST /api/v1/auth/login - публичный
+      * GET /api/v1/auth/me - защищенный (JWT middleware)
+      * GET /health - health check
+
+3.13. Обработка ошибок
+    - Единый формат ошибок
+    - HTTP статус коды:
+      * 400 - Bad Request (валидация)
+      * 401 - Unauthorized (неверные credentials)
+      * 404 - Not Found
+      * 409 - Conflict (email уже существует)
+      * 500 - Internal Server Error
+
+3.14. Dockerfile для Auth Service
+    - Мультистейдж build
+    - Alpine образ
+    - Порт 8081
+    - Health check
+
+3.15. Тестирование - УБРАТЬ ДЛЯ MVP
+    - Для MVP достаточно ручного тестирования через Postman/браузер
+
+================================================================================
+ЭТАП 4: MEDICAL SERVICE
+================================================================================
+
+4.1. Инициализация проекта
+    - Создать medical-service/go.mod
+    - Установить зависимости (аналогично Auth Service):
+      * github.com/go-chi/chi/v5
+      * github.com/go-chi/cors
+      * github.com/lib/pq
+      * github.com/jmoiron/sqlx - УБРАТЬ ДЛЯ MVP
+      * github.com/google/uuid (для UUID)
+    - Создать main.go
+
+4.2. Структура проекта
+    - Создать структуру:
+      * cmd/medical/main.go
+      * internal/config/config.go
+      * internal/database/database.go
+      * internal/models/medical_record.go (модель медицинской записи)
+      * internal/models/health_metric.go (модель показателя здоровья)
+      * internal/repository/medical_repository.go
+      * internal/repository/health_repository.go
+      * internal/service/medical_service.go
+      * internal/service/health_service.go
+      * internal/handler/medical_handler.go
+      * internal/handler/health_handler.go
+      * internal/middleware/cors.go
+      * internal/middleware/logging.go
+      * internal/middleware/auth.go (JWT проверка, опционально если Gateway не проверяет)
+      * internal/router/router.go
+      * migrations/ (SQL миграции)
+
+4.3. Конфигурация
+    - Создать config.go:
+      * Порт сервиса (8082)
+      * Параметры подключения к PostgreSQL
+      * CORS настройки
+
+4.4. Модели данных
+    - MedicalRecord:
+      * ID (UUID или int)
+      * UserID (int, foreign key)
+      * Title (string)
+      * Description (string, text)
+      * RecordDate (time.Time)
+      * DoctorName (string, опционально)
+      * Diagnosis (string, опционально)
+      * CreatedAt (time.Time)
+      * UpdatedAt (time.Time)
+    - HealthMetric (УПРОЩЕННАЯ ВЕРСИЯ ДЛЯ MVP):
+      * ID (UUID или int)
+      * UserID (int, foreign key)
+      * MetricType (string: "blood_pressure", "pulse", "weight", "temperature")
+      * Value (float64 - простое число, без сложных структур)
+      * Unit (string: "mmHg", "bpm", "kg", "°C")
+      * RecordedAt (time.Time)
+      * Notes (string, опционально)
+      * CreatedAt (time.Time)
+      * ПРИМЕЧАНИЕ: Для MVP можно упростить - убрать сложные типы метрик, сделать только простые числовые значения
+
+4.5. Миграции БД
+    - Создать migrations/001_create_medical_records_table.sql:
+      * Таблица medical_records
+      * Foreign key на users (user_id)
+      * Индексы на user_id, record_date
+    - Создать migrations/002_create_health_metrics_table.sql:
+      * Таблица health_metrics
+      * Foreign key на users (user_id)
+      * Индексы на user_id, metric_type, recorded_at
+      * Composite index на (user_id, metric_type, recorded_at) для быстрого поиска
+
+4.6. Database слой
+    - Создать database.go (аналогично Auth Service)
+    - Подключение к PostgreSQL
+    - Connection pooling
+
+4.7. Repository слой
+    - medical_repository.go:
+      * CreateRecord(record) - создание записи
+      * GetRecordByID(id, userID) - получение записи (с проверкой владельца)
+      * GetRecordsByUserID(userID, limit, offset) - список записей пользователя (простая пагинация)
+      * UpdateRecord(record) - обновление записи
+      * DeleteRecord(id, userID) - удаление записи
+      * ПРИМЕЧАНИЕ: GetRecordsByDateRange - УБРАТЬ ДЛЯ MVP (достаточно базового списка)
+    - health_repository.go (УПРОЩЕННО ДЛЯ MVP):
+      * CreateMetric(metric) - создание показателя
+      * GetMetricByID(id, userID) - получение показателя
+      * GetMetricsByUserID(userID, limit, offset) - список показателей (без фильтрации по типу для MVP)
+      * UpdateMetric(metric) - обновление
+      * DeleteMetric(id, userID) - удаление
+      * ПРИМЕЧАНИЕ: Для MVP убрать сложные фильтры (по дате, по типу) - оставить только базовый список
+
+4.8. Service слой (бизнес-логика)
+    - medical_service.go:
+      * CreateRecord(userID, record) - создание записи
+      * GetRecord(userID, recordID) - получение записи
+      * GetUserRecords(userID, limit, offset) - простой список записей с пагинацией
+      * UpdateRecord(userID, recordID, record) - обновление (с проверкой владельца)
+      * DeleteRecord(userID, recordID) - удаление (с проверкой владельца)
+      * Валидация данных перед сохранением
+    - health_service.go (УПРОЩЕННО ДЛЯ MVP):
+      * CreateMetric(userID, metric) - создание показателя
+      * GetMetric(userID, metricID) - получение
+      * GetUserMetrics(userID, limit, offset) - простой список без фильтрации
+      * UpdateMetric(userID, metricID, metric) - обновление
+      * DeleteMetric(userID, metricID) - удаление
+      * Базовая валидация (значение > 0)
+      * ПРИМЕЧАНИЕ: Убрать сложные фильтры и историю для MVP
+
+4.9. Handler слой (HTTP обработчики)
+    - medical_handler.go:
+      * CreateRecordHandler - POST /api/v1/medical/records:
+        - Извлечение user_id из контекста
+        - Парсинг JSON тела
+        - Валидация
+        - Вызов CreateRecord из service
+        - Возврат 201 Created
+      * GetRecordHandler - GET /api/v1/medical/records/:id:
+        - Извлечение user_id и record_id
+        - Вызов GetRecord
+        - Возврат 200 OK или 404
+      * GetRecordsHandler - GET /api/v1/medical/records:
+        - Query параметры: limit, offset (УБРАТЬ фильтры по дате для MVP)
+        - Вызов GetUserRecords
+        - Возврат списка с пагинацией
+      * UpdateRecordHandler - PUT /api/v1/medical/records/:id:
+        - Парсинг и валидация
+        - Вызов UpdateRecord
+        - Возврат 200 OK или 404/403
+      * DeleteRecordHandler - DELETE /api/v1/medical/records/:id:
+        - Вызов DeleteRecord
+        - Возврат 204 No Content или 404/403
+    - health_handler.go:
+      * CreateMetricHandler - POST /api/v1/medical/health-metrics:
+        - Аналогично CreateRecordHandler
+      * GetMetricHandler - GET /api/v1/medical/health-metrics/:id
+      * GetMetricsHandler - GET /api/v1/medical/health-metrics:
+        - Query параметры: limit, offset (убрать фильтры по типу и дате для MVP)
+      * UpdateMetricHandler - PUT /api/v1/medical/health-metrics/:id
+      * DeleteMetricHandler - DELETE /api/v1/medical/health-metrics/:id
+      * ПРИМЕЧАНИЕ: Убрать GetLatestMetricsHandler для MVP - упростить до базового списка
+
+4.10. Middleware
+    - CORS middleware
+    - Logging middleware
+    - JWT middleware (если Gateway не проверяет, или для дополнительной проверки)
+
+4.11. Роутинг
+    - Настроить Chi router:
+      * /api/v1/medical/records/* - CRUD для записей
+      * /api/v1/medical/health-metrics/* - CRUD для показателей
+      * GET /health - health check
+    - Все эндпоинты защищены JWT (user_id из токена)
+
+4.12. Обработка ошибок
+    - Единый формат ошибок
+    - HTTP статус коды:
+      * 400 - Bad Request
+      * 401 - Unauthorized
+      * 403 - Forbidden (попытка доступа к чужой записи)
+      * 404 - Not Found
+      * 500 - Internal Server Error
+
+4.13. Dockerfile для Medical Service
+    - Мультистейдж build
+    - Alpine образ
+    - Порт 8082
+    - Health check
+
+================================================================================
+ЭТАП 5: FRONTEND (Vue.js + TypeScript)
+================================================================================
+
+5.1. Инициализация проекта
+    - Создать frontend/ директорию
+    - npm create vue@latest или vue create
+    - Выбрать TypeScript, Router, Pinia (state management)
+    - Установить зависимости:
+      * axios (HTTP клиент)
+      * vue-router
+      * pinia
+      * @types/node (если нужно)
+
+5.2. Структура проекта
+    - src/
+      * main.ts
+      * App.vue
+      * router/index.ts
+      * stores/auth.ts (Pinia store для авторизации)
+      * stores/medical.ts (Pinia store для медицинских данных)
+      * services/api.ts (axios конфигурация)
+      * services/auth.service.ts
+      * services/medical.service.ts
+      * services/health.service.ts
+      * types/user.ts
+      * types/medical.ts
+      * types/health.ts
+      * components/
+        - common/ (общие компоненты)
+        - auth/ (компоненты авторизации)
+        - medical/ (компоненты медицинских записей)
+        - health/ (компоненты показателей здоровья)
+      * views/
+        - LoginView.vue
+        - RegisterView.vue
+        - DashboardView.vue
+        - MedicalRecordsView.vue
+        - HealthMetricsView.vue
+      * ПРИМЕЧАНИЕ: composables и utils - УБРАТЬ ДЛЯ MVP (можно добавить позже если нужно)
+
+5.3. TypeScript типы
+    - types/user.ts:
+      * User interface
+      * LoginRequest, RegisterRequest
+      * AuthResponse
+    - types/medical.ts:
+      * MedicalRecord interface
+      * CreateRecordRequest, UpdateRecordRequest
+    - types/health.ts:
+      * HealthMetric interface
+      * MetricType enum
+      * CreateMetricRequest
+
+5.4. API сервисы
+    - services/api.ts:
+      * Создать axios instance
+      * Базовый URL: http://localhost:8080/api/v1
+      * Interceptor для добавления JWT токена в заголовки
+      * Interceptor для обработки ошибок (401 -> редирект на login)
+    - services/auth.service.ts:
+      * register(data) - POST /auth/register
+      * login(email, password) - POST /auth/login
+      * getCurrentUser() - GET /auth/me
+      * logout() - очистка токена
+    - services/medical.service.ts:
+      * getRecords(params) - GET /medical/records
+      * getRecord(id) - GET /medical/records/:id
+      * createRecord(data) - POST /medical/records
+      * updateRecord(id, data) - PUT /medical/records/:id
+      * deleteRecord(id) - DELETE /medical/records/:id
+    - services/health.service.ts:
+      * getMetrics(params) - GET /medical/health-metrics
+      * getMetric(id) - GET /medical/health-metrics/:id
+      * createMetric(data) - POST /medical/health-metrics
+      * updateMetric(id, data) - PUT /medical/health-metrics/:id
+      * deleteMetric(id) - DELETE /medical/health-metrics/:id
+      * ПРИМЕЧАНИЕ: getLatestMetrics - УБРАТЬ ДЛЯ MVP
+
+5.5. Pinia stores
+    - stores/auth.ts:
+      * State: user, token, isAuthenticated
+      * Actions: login, register, logout, fetchUser
+      * Getters: isLoggedIn
+      * Сохранение токена в localStorage
+    - stores/medical.ts:
+      * State: records, currentRecord, loading, error
+      * Actions: fetchRecords, fetchRecord, createRecord, updateRecord, deleteRecord
+      * ПРИМЕЧАНИЕ: Getters - УБРАТЬ ДЛЯ MVP (достаточно базового state)
+
+5.6. Router
+    - router/index.ts:
+      * Настроить маршруты:
+        - /login - LoginView
+        - /register - RegisterView
+        - /dashboard - DashboardView (защищенный)
+        - /records - MedicalRecordsView (защищенный)
+        - /health - HealthMetricsView (защищенный)
+      * Navigation guard для проверки авторизации
+      * Редирект неавторизованных на /login
+
+5.7. Компоненты авторизации
+    - components/auth/LoginForm.vue:
+      * Форма с полями email, password
+      * Валидация
+      * Вызов login из auth store
+      * Обработка ошибок
+      * Редирект на dashboard при успехе
+    - components/auth/RegisterForm.vue:
+      * Форма: email, password, confirmPassword, firstName, lastName
+      * Валидация (совпадение паролей, формат email)
+      * Вызов register из auth store
+
+5.8. Компоненты медицинских записей
+    - components/medical/RecordList.vue:
+      * Список записей с пагинацией (УБРАТЬ фильтрацию по дате для MVP)
+      * Кнопки редактирования/удаления
+    - components/medical/RecordForm.vue:
+      * Форма создания/редактирования записи
+      * Поля: title, description, recordDate, doctorName, diagnosis
+      * Валидация
+    - components/medical/RecordCard.vue:
+      * Карточка записи для отображения в списке
+
+5.9. Компоненты показателей здоровья
+    - components/health/MetricForm.vue:
+      * Форма создания показателя
+      * Выбор типа метрики (dropdown)
+      * Поля в зависимости от типа
+      * Валидация значений
+    - components/health/MetricList.vue:
+      * Простой список показателей (УБРАТЬ фильтрацию и группировку для MVP)
+    - components/health/MetricChart.vue (УБРАТЬ ДЛЯ MVP - опционально в будущем):
+      * Простой график истории показателей (можно использовать Chart.js)
+      * ПРИМЕЧАНИЕ: Для MVP графики не нужны - только список
+
+5.10. Views (страницы)
+    - views/LoginView.vue:
+      * Использование LoginForm компонента
+    - views/RegisterView.vue:
+      * Использование RegisterForm компонента
+    - views/DashboardView.vue (УПРОЩЕНО ДЛЯ MVP):
+      * Приветствие пользователя
+      * Последние медицинские записи (5 штук)
+      * Быстрые ссылки на разделы
+      * ПРИМЕЧАНИЕ: Убрать последние показатели здоровья для MVP - упростить дашборд
+    - views/MedicalRecordsView.vue:
+      * RecordList компонент
+      * Кнопка "Добавить запись"
+      * Модальное окно с RecordForm
+    - views/HealthMetricsView.vue (УПРОЩЕННАЯ ВЕРСИЯ ДЛЯ MVP):
+      * MetricList компонент (простой список без фильтров)
+      * Кнопка "Добавить показатель"
+      * Модальное окно с MetricForm (простая форма)
+      * ПРИМЕЧАНИЕ: Убрать сложные фильтры и графики для MVP
+
+5.11. Общие компоненты
+    - components/common/Navbar.vue:
+      * Навигационное меню
+      * Кнопка выхода
+      * Имя пользователя
+    - components/common/LoadingSpinner.vue
+    - components/common/ErrorMessage.vue
+
+5.12. Стилизация (УПРОЩЕНО ДЛЯ MVP)
+    - Базовый CSS (можно использовать простой framework типа Bootstrap)
+    - Адаптивный дизайн - опционально для MVP
+    - Единый стиль приложения (базовый)
+
+5.13. Обработка ошибок
+    - Глобальный error handler
+    - Отображение ошибок пользователю
+    - Обработка сетевых ошибок
+
+5.14. Dockerfile для Frontend
+    - Мультистейдж build
+    - Stage 1: npm install и build
+    - Stage 2: nginx для статических файлов
+    - Порт 80
+    - Настройка nginx для SPA (fallback на index.html)
+
+5.15. Конфигурация для production
+    - Переменные окружения для API URL
+    - .env файлы для dev/prod
+
+================================================================================
+ЭТАП 6: DOCKER И DOCKER COMPOSE
+================================================================================
+
+6.1. Dockerfile для каждого сервиса
+    - Уже созданы на предыдущих этапах
+    - Проверить все Dockerfile:
+      * Мультистейдж builds
+      * Правильные порты
+      * Health checks
+      * Минимальные образы (alpine)
+
+6.2. Docker Compose файл
+    - Создать docker-compose.yml в корне проекта:
+      * Сервисы:
+        - api-gateway (порт 8080)
+        - auth-service (порт 8081, внутренний)
+        - medical-service (порт 8082, внутренний)
+        - frontend (порт 80)
+        - postgres-auth (порт 5432, внутренний, для auth-service)
+        - postgres-medical (порт 5433, внутренний, для medical-service)
+        ПРИМЕЧАНИЕ ДЛЯ MVP: Можно использовать ОДНУ БД с разными схемами для упрощения
+      * Networks:
+        - backend-network (для связи между сервисами)
+        - frontend-network (для связи frontend с gateway)
+      * Volumes:
+        - postgres-auth-data
+        - postgres-medical-data
+      * Environment variables для каждого сервиса
+      * Depends_on для порядка запуска
+      * Health checks для всех сервисов
+
+6.3. .env файл для Docker Compose
+    - Создать .env файл:
+      * Пароли для PostgreSQL
+      * JWT секреты
+      * Порты (если нужно изменить)
+      * API Gateway URL для frontend
+
+6.4. Скрипты для работы с Docker
+    - scripts/build.sh / build.bat:
+      * Сборка всех образов
+    - scripts/up.sh / up.bat:
+      * docker-compose up
+    - scripts/down.sh / down.bat:
+      * docker-compose down
+    - scripts/logs.sh / logs.bat:
+      * Просмотр логов
+
+6.5. Миграции БД в Docker (УПРОЩЕНО ДЛЯ MVP)
+    - Вариант 1: Запуск миграций при старте сервиса (ПРОСТОЙ SQL СКРИПТ)
+    - ПРИМЕЧАНИЕ: Для MVP не нужны сложные инструменты миграций - достаточно простых SQL файлов
+
+6.6. Тестирование Docker Compose
+    - Запустить все сервисы
+    - Проверить health checks
+    - Проверить связь между сервисами
+    - Проверить доступность frontend
+
+================================================================================
+ЭТАП 7: ДОКУМЕНТАЦИЯ И ДИАГРАММЫ (СООТВЕТСТВИЕ ТЗ)
+================================================================================
+
+7.0. ОБЯЗАТЕЛЬНЫЕ РАЗДЕЛЫ ДЛЯ ПОЯСНИТЕЛЬНОЙ ЗАПИСКИ (ПО ТЗ):
+    - Описание предметной области (мониторинг здоровья и медицинские записи)
+    - Функциональные и нефункциональные требования
+    - Ограничения проекта (пользователи, ресурсы, технологии, сроки)
+    - Обзор архитектурных стилей с оценкой по критериям:
+      * Масштабируемость
+      * Производительность
+      * Простота разработки/поддержки
+      * Совместимость с технологиями
+      * Результаты в виде таблицы
+      * Обоснование выбора микросервисной архитектуры
+    - Паттерны проектирования (ИСПОЛЬЗУЕМЫЕ В ПРОЕКТЕ):
+      * BACKEND:
+        - Repository Pattern - используется (repository слой для работы с БД)
+        - Service Layer Pattern - используется (service слой для бизнес-логики)
+        - API Gateway Pattern - используется (API Gateway для маршрутизации)
+        - Layered Architecture - используется (handler -> service -> repository -> database)
+      * FRONTEND:
+        - MVC (Model-View-Controller) - используется:
+          * Model: Pinia stores (данные)
+          * View: Vue компоненты (отображение)
+          * Controller: Vue компоненты + handlers (логика)
+        - MVVM (Model-View-ViewModel) - частично (Vue.js реактивность)
+      * НЕ ИСПОЛЬЗУЕМ:
+        - CQRS - слишком сложно для MVP
+        - DDD - слишком сложно для MVP
+      * Описание применимости каждого паттерна к проекту
+    - Обоснование выбора технологий:
+      * Go + Chi (почему для backend)
+      * Vue.js + TypeScript (почему для frontend)
+      * PostgreSQL (почему для БД)
+      * Docker, Kubernetes (почему для инфраструктуры)
+      * Jenkins (почему для CI/CD)
+
+7.1. API документация
+    - Создать docs/api.md:
+      * Описание всех эндпоинтов
+      * Примеры запросов/ответов
+      * Коды ошибок
+    - Или использовать Swagger/OpenAPI (опционально)
+
+7.2. Архитектурные диаграммы (draw.io) - ОБЯЗАТЕЛЬНО ПО ТЗ:
+    - docs/diagrams/architecture-overview.png (ОБЯЗАТЕЛЬНО):
+      * Общая схема системы
+      * Все компоненты и их связи
+      * Основные компоненты (микросервисы, БД, API Gateway, Frontend)
+    - docs/diagrams/microservices-interaction.png (ОБЯЗАТЕЛЬНО):
+      * Взаимодействие между компонентами
+      * Потоки запросов
+      * Как компоненты обмениваются данными
+    - docs/diagrams/api-contracts.png (ОБЯЗАТЕЛЬНО):
+      * API и контракты между компонентами
+      * REST API эндпоинты
+      * Формат запросов/ответов
+    - docs/diagrams/database-schema.png (ОБЯЗАТЕЛЬНО):
+      * ER-диаграмма БД
+      * Модели данных
+      * Таблицы и связи
+    - docs/diagrams/deployment.png (ОБЯЗАТЕЛЬНО):
+      * Схема физической инфраструктуры
+      * Docker контейнеры
+      * Сети и volumes
+      * CI/CD pipeline (Jenkins)
+      * Kubernetes (описание, без реального деплоя)
+    - ПРИМЕЧАНИЕ: Можно использовать UML, C4 Model, DFD, ERD, BPMN - на выбор
+
+7.3. README.md
+    - Описание проекта
+    - Архитектура
+    - Инструкции по запуску
+    - Требования
+    - Структура проекта
+
+7.4. Инструкция по развертыванию
+    - docs/deployment.md:
+      * Локальное развертывание (Docker Compose)
+      * Описание Kubernetes развертывания (без реального деплоя)
+      * Переменные окружения
+      * Troubleshooting
+
+================================================================================
+ЭТАП 8: CI/CD (JENKINS)
+================================================================================
+
+8.1. Jenkinsfile для проекта (ОПЦИОНАЛЬНО ДЛЯ MVP)
+    - Создать простой Jenkinsfile в корне:
+      * Pipeline stages:
+        - Checkout (git)
+        - Build (сборка всех сервисов)
+        - Build Docker images
+      * ПРИМЕЧАНИЕ: Для MVP можно вообще пропустить CI/CD или сделать минимальный pipeline
+
+8.2. Jenkins pipeline stages
+    - Stage "Build Backend Services":
+      * go build для каждого сервиса
+      * Проверка компиляции
+    - Stage "Build Frontend":
+      * npm install
+      * npm run build
+      * Проверка сборки
+    - Stage "Build Docker Images":
+      * docker build для каждого сервиса
+      * Тегирование образов
+    - Stage "Integration Tests" (УБРАТЬ ДЛЯ MVP - опционально):
+      * Запуск docker-compose
+      * Запуск тестов
+    - Stage "Archive Artifacts":
+      * Сохранение артефактов
+
+8.3. Jenkins конфигурация
+    - Описать в docs/jenkins.md:
+      * Настройка Jenkins
+      * Создание pipeline job
+      * Настройка credentials (если нужны)
+      * Webhooks (опционально)
+
+================================================================================
+ЭТАП 9: ТЕСТИРОВАНИЕ И ОТЛАДКА
+================================================================================
+
+9.1. Тестирование API Gateway
+    - Проверить маршрутизацию
+    - Проверить JWT проверку
+    - Проверить проксирование запросов
+    - Проверить обработку ошибок
+
+9.2. Тестирование Auth Service
+    - Регистрация пользователя
+    - Авторизация
+    - Получение токена
+    - Валидация токена
+    - Обработка ошибок (неверный email, пароль)
+
+9.3. Тестирование Medical Service
+    - Создание записи
+    - Получение записей
+    - Обновление записи
+    - Удаление записи
+    - Проверка изоляции данных (пользователь не может видеть чужие записи)
+    - Создание показателей здоровья
+    - Получение списка показателей (УБРАТЬ "историю" - просто список)
+
+9.4. Тестирование Frontend
+    - Регистрация/авторизация
+    - Навигация между страницами
+    - Создание/редактирование записей
+    - Создание показателей
+    - Обработка ошибок
+    - ПРИМЕЧАНИЕ: Responsive дизайн - опционально для MVP
+
+9.5. Интеграционное тестирование
+    - Полный flow: регистрация -> авторизация -> создание записи -> просмотр
+    - Проверка работы через API Gateway
+    - Проверка изоляции данных между пользователями
+
+9.6. Нагрузочное тестирование - УБРАТЬ ДЛЯ MVP
+    - Для MVP не требуется
+
+================================================================================
+ЭТАП 10: ФИНАЛИЗАЦИЯ
+================================================================================
+
+10.1. Код ревью
+    - Проверить код на ошибки
+    - Проверить обработку ошибок
+    - Проверить безопасность (SQL injection, XSS)
+    - Проверить валидацию данных
+
+10.2. Оптимизация (МИНИМАЛЬНО ДЛЯ MVP)
+    - Проверить базовые индексы в БД
+    - Проверка размера Docker образов (не критично для MVP)
+
+10.3. Документация
+    - Обновить README
+    - Проверить все диаграммы
+    - Добавить комментарии в код (где нужно)
+
+10.4. Подготовка к демонстрации
+    - Создать тестовые данные
+    - Подготовить сценарий демонстрации
+    - Проверить работу всех функций
+
+================================================================================
+ПРИМЕЧАНИЯ:
+================================================================================
+
+- Все сервисы должны иметь health check endpoints
+- Использовать единый формат логирования
+- Все пароли должны хешироваться (bcrypt)
+- JWT токены должны иметь expiration time
+- Все пользовательские данные должны валидироваться
+- Использовать prepared statements для защиты от SQL injection
+- CORS должен быть настроен правильно
+- Обработка ошибок должна быть единообразной
+- Код должен быть читаемым и документированным
+- Git коммиты должны быть осмысленными
+
+================================================================================
+ПОРЯДОК ВЫПОЛНЕНИЯ:
+================================================================================
+
+Рекомендуемый порядок:
+1. Этап 1 (Инициализация)
+2. Этап 7.0 (Описание предметной области, требования, обзор архитектур, паттерны) - ДЛЯ ПОЯСНИТЕЛЬНОЙ ЗАПИСКИ
+3. Этап 2 (API Gateway) - базовая структура
+4. Этап 3 (Auth Service) - полностью
+5. Этап 4 (Medical Service) - полностью
+6. Этап 5 (Frontend) - базовая версия
+7. Этап 6 (Docker) - настройка
+8. Этап 7.2 (Диаграммы архитектуры) - ОБЯЗАТЕЛЬНО ПО ТЗ
+9. Тестирование интеграции
+10. Этап 7.1, 7.3, 7.4 (Остальная документация)
+11. Этап 8 (CI/CD) - ОПЦИОНАЛЬНО для MVP
+12. Этап 9-10 (Ручное тестирование и финализация)
+
+================================================================================
+КРАТКОЕ РЕЗЮМЕ ДЛЯ MVP - ЧТО РЕАЛЬНО НУЖНО:
+================================================================================
+
+МИНИМАЛЬНЫЙ НАБОР ДЛЯ РАБОТАЮЩЕГО MVP:
+
+BACKEND:
+- API Gateway: базовая маршрутизация, JWT проверка, CORS
+- Auth Service: регистрация, авторизация, получение текущего пользователя
+- Medical Service: CRUD для медицинских записей, CRUD для показателей здоровья (простой список)
+
+FRONTEND:
+- Страницы: Login, Register, Dashboard, Medical Records, Health Metrics
+- Базовые формы: создание/редактирование записей и показателей
+- Простой список без сложных фильтров
+
+ИНФРАСТРУКТУРА:
+- Docker Compose для запуска всего стека
+- Одна БД PostgreSQL (можно с разными схемами) или две простые БД
+- Простые SQL миграции
+
+ЧТО УБРАТЬ/УПРОСТИТЬ ДЛЯ MVP:
+- Unit/Integration тесты
+- Сложные фильтры (по дате, по типу метрик)
+- Графики и визуализации
+- UpdateUser/DeleteUser в Auth Service
+- Сложные инструменты миграций
+- Нагрузочное тестирование
+- CI/CD (опционально, минимальный)
+- Responsive дизайн (опционально)
+- sqlx (использовать стандартный database/sql)
+
+ИТОГО: Рабочий прототип с базовым CRUD, авторизацией и простым UI.
+
+================================================================================
+ПРОВЕРКА СООТВЕТСТВИЯ ТЗ:
+================================================================================
+
+ОБЯЗАТЕЛЬНО ПО ТЗ (проверить наличие в TODO):
+✓ 1. Описание предметной области - ЭТАП 7.0
+✓ 2. Функциональные и нефункциональные требования - ЭТАП 7.0
+✓ 3. Ограничения проекта - ЭТАП 7.0
+✓ 4. Обзор архитектурных стилей с таблицей оценки - ЭТАП 7.0
+✓ 5. Диаграммы архитектуры (компоненты, взаимодействия, API, БД, инфраструктура) - ЭТАП 7.2
+✓ 6. Паттерны проектирования (MVC, MVVM, CQRS, DDD) - ЭТАП 7.0
+✓ 7. Обоснование выбора технологий - ЭТАП 7.0
+✓ 8. Прототип MVP - ЭТАПЫ 2-6
+✓ 9. Docker и Docker Compose - ЭТАП 6
+✓ 10. CI/CD (Jenkins) - ЭТАП 8 (опционально для MVP, но описать нужно)
+
+СТРУКТУРА ПОЯСНИТЕЛЬНОЙ ЗАПИСКИ (по ГОСТ):
+- Титульный лист
+- Задание на курсовую работу
+- Аннотация (1-2 стр.)
+- Содержание
+- Введение (1-2 стр.)
+- Основная часть (10-40 стр.):
+  * Описание предметной области
+  * Требования и ограничения
+  * Обзор архитектурных стилей
+  * Диаграммы архитектуры
+  * Паттерны проектирования
+  * Обоснование технологий
+  * Описание реализации MVP
+- Заключение (1-2 стр.)
+- Список использованной литературы
+- Приложения (диаграммы, код, скриншоты)
+
+================================================================================
+

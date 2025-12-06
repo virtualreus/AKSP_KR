@@ -1,0 +1,30 @@
+# Go
+bin/
+*.exe
+*.test
+*.out
+coverage.txt
+
+# IDE
+.idea/
+.vscode/
+
+# Dependencies / build
+vendor/
+node_modules/
+dist/
+build/
+
+# Env/config
+.env
+.env.*
+*.local
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Docker
+*.log
+docker/*.env
+
